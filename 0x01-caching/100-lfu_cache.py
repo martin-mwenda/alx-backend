@@ -1,30 +1,23 @@
 #!/usr/bin/env python3
 """
-Module to implement LFU Caching
+Module implements LFU (Least Frequently Used) Cache Logic
 """
 from base_caching import BaseCaching
-from collections import OrderedDict, defaultdict
 
 
 class LFUCache(BaseCaching):
-    """
-    LFUCache is a caching system that uses a Least Frequently Used
-    (LFU) algorithm.
-    It discards the least frequently used item if the cache exceeds MAX_ITEMS.
-    If multiple items have the same frequency, it discards the least
-    recently used.
-    """
+    """This is a class that defines LFUCache inheriting from BaseCache"""
 
     def __init__(self):
-        """Initialize the cache and frequency tracking."""
+        """Class Constructor"""
         super().__init__()
-        self.cache_data = OrderedDict()  # Store cache items
-        self.usage_count = defaultdict(int)  # Track access frequency each key
-        self.frequency_order = OrderedDict()
+        self.frequency = {}  # Track frequency of keys
+        self.order = {}  # Track the order of keys for LRU management
+        self.min_freq = 0  # Track the minimum frequency in use
 
     def put(self, key, item):
         """
-        Add an item in the cache following LFU replacement policy.
+        This is a method that allows adding a key-value pair to the cache
         Args:
             key - the key of the data to be added
             item - the value of the data to be added
@@ -32,65 +25,58 @@ class LFUCache(BaseCaching):
         if key is None or item is None:
             return
 
-        # If key already exists, just update item and frequency
         if key in self.cache_data:
-            self.cache_data[key] = item
+            self.cache_data[key] = item  # Update existing item
             self._update_frequency(key)
             return
 
-        # Add the new item
+        if len(self.cache_data) >= BaseCaching.MAX_ITEMS:
+            # Evict the least frequently used item
+            self._evict()
+
         self.cache_data[key] = item
-        self.usage_count[key] = 1
-        self.frequency_order[key] = None
-
-        # Check if we need to discard an item
-        if len(self.cache_data) > BaseCaching.MAX_ITEMS:
-            # Find the least frequently used keys
-            min_freq = min(self.usage_count.values())
-            lfu_keys = [
-                    k for k in self.cache_data.keys()
-                    if self.usage_count[k] == min_freq]
-
-            # If there's a tie, discard the least recently used item amongthem
-            if len(lfu_keys) > 1:
-                # Using OrderedDict's ordering to determine least recentlyused
-                discard_key = next(
-                        k for k in self.frequency_order if k in lfu_keys)
-            else:
-                discard_key = lfu_keys[0]
-
-            # Discard the selected key
-            del self.cache_data[discard_key]
-            del self.usage_count[discard_key]
-            del self.frequency_order[discard_key]
-            print(f"DISCARD: {discard_key}")
-
-        # Mark the newly added item as the most recently used of its freq level
-        self._update_frequency(key)
+        self.frequency[key] = 1
+        self.order[key] = len(self.cache_data)  # Use insertion index as order
+        self.min_freq = min(self.min_freq, self.frequency[key])
 
     def get(self, key):
         """
-        Retrieve an item from the cache by key and update its frequency.
+        This is a method that retrieves an item from the cache by the key.
         Args:
-            key - key to the data to be retrieved
+            key - key to the data to be retrieved.
         Returns:
             Value of the item if found, None if key is None or doesn't exist.
         """
         if key is None or key not in self.cache_data:
             return None
 
-        # Update frequency and return the item
+        # Update frequency of the key
         self._update_frequency(key)
         return self.cache_data[key]
 
     def _update_frequency(self, key):
-        """
-        Update the frequency and order of the given key to reflect
-        recent access.
-        """
-        # Increase frequency count
-        self.usage_count[key] += 1
-        # Move key to the end of frequency_order to mark it most recently used
-        if key in self.frequency_order:
-            del self.frequency_order[key]
-        self.frequency_order[key] = None
+        """Update the frequency and order of the given key."""
+        freq = self.frequency[key]
+        self.frequency[key] += 1
+        new_freq = self.frequency[key]
+
+        # If this was the only key with the min frequency, update min_freq
+        if (freq == self.min_freq and
+                not any(f == freq for f in self.frequency.values())):
+            self.min_freq += 1
+
+        # Update the order to reflect the most recently used
+        self.order[key] = len(self.cache_data)  # Update order to the latest
+
+    def _evict(self):
+        """Evict the least frequently used item from the cache."""
+        lfu_keys = [k for k, v in self.frequency.items() if v == self.min_freq]
+
+        # If there are multiple LFU keys, use LRU to determine which to evict
+        key_to_evict = min(lfu_keys, key=lambda k: self.order[k])
+
+        # Remove the item from cache
+        del self.cache_data[key_to_evict]
+        del self.frequency[key_to_evict]
+        del self.order[key_to_evict]
+        print(f"DISCARD: {key_to_evict}")
