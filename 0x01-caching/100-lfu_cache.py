@@ -67,7 +67,8 @@ class LFUCache(BaseCaching):
         self.lfu_order.append(key)
 
         # If was the only key with the minimum frequency, increment min_freq
-        if freq == self.min_freq and not any(f == freq for f in self.freq_map.values()):
+        if (freq == self.min_freq and
+                not any(f == freq for f in self.freq_map.values())):
             self.min_freq += 1
 
     def _evict(self):
