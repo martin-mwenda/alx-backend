@@ -1,56 +1,54 @@
 #!/usr/bin/env python3
 """
-Module to implement MRU Caching
+Module implements Basic Caching using MRU (Most Recently Used) Cache Logic
 """
 from base_caching import BaseCaching
-from collections import OrderedDict
 
 
 class MRUCache(BaseCaching):
-    """
-    MRUCache is a caching system that uses a Most Recently Used
-    (MRU) algorithm.
-    It inherits from BaseCaching and has a maximum size defined by MAX_ITEMS.
-    """
+    """This class defines MRUCache inheriting from BaseCaching"""
 
     def __init__(self):
-        """Initialize the cache using OrderedDict to maintain MRU order."""
+        """Class Constructor"""
         super().__init__()
-        self.cache_data = OrderedDict()  # OrderedDict to track access order
+        self.order = []  # List to maintain the order of keys (mru)
 
     def put(self, key, item):
         """
-        Add an item in the cache following MRU replacement policy.
+        This method allows adding a key-value pair to the cache.
         Args:
             key - the key of the data to be added
             item - the value of the data to be added
         """
-        if key is not None and item is not None:
-            # If key already exists, delete it to update its position
-            if key in self.cache_data:
-                del self.cache_data[key]
+        if key is None or item is None:
+            return  # Do nothing if key or item is None
 
-            # Add the item to the cache, marking it as most recently used
-            self.cache_data[key] = item
-
-            # If we exceed MAX_ITEMS, remove the most recently used item
-            if len(self.cache_data) > BaseCaching.MAX_ITEMS:
-                # Pop the last item from OrderedDict (MRU behavior)
-                mru_key, _ = self.cache_data.popitem(last=True)
+        if key in self.cache_data:
+            # If the key already exists, remove it to update its order
+            self.order.remove(key)
+        else:
+            # If the cache is full, evict the most recently used item
+            if len(self.cache_data) >= BaseCaching.MAX_ITEMS:
+                mru_key = self.order.pop()  # Remove the last item (mru)
+                self.cache_data.pop(mru_key)
                 print(f"DISCARD: {mru_key}")
+
+        # Add the new key-value pair to the cache
+        self.cache_data[key] = item
+        self.order.append(key)  # Track the order of keys
 
     def get(self, key):
         """
-        Retrieve an item from the cache by key.
+        This method retrieves an item from the cache by the key.
         Args:
-            key - key to the data to be retrieved
+            key - key to the data to be retrieved.
         Returns:
             Value of the item if found, None if key is None or doesn't exist.
         """
         if key is None or key not in self.cache_data:
-            return None
+            return None  # Return None if key is invalid
 
-        # Move accessed item to the end (mark as most recently used)
-        item = self.cache_data.pop(key)
-        self.cache_data[key] = item
-        return item
+        # Update the order to reflect that this key has been accessed
+        self.order.remove(key)
+        self.order.append(key)
+        return self.cache_data[key]  # Return the cached value
